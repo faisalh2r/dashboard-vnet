@@ -1,0 +1,19 @@
+/* Mengatur warna latar belakang area upload menjadi abu-abu */
+div[data-testid="stFileUploadDropzone"] {
+    background-color: #D3D3D3 !important; /* Warna abu-abu */
+}
+
+/* Mengubah warna dan style sidebar menjadi lebih gelap agar kontras */
+[data-testid="stSidebar"] {
+    background-color: #ffde59; /* Warna kuning*/
+    color: black;
+}
+
+/* Mengatur elemen sidebar lainnya agar lebih terlihat */
+.sidebar-content, .css-1lcbmhc.e1fqkh3o3 {
+    background-color: #f5f5f5 !important;
+    color: black !important;
+}
+
+
+
