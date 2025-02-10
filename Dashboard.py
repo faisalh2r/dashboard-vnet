@@ -178,89 +178,128 @@ def hopkins(X):
 
     return H
 
-#--------Fungsi Dataset Pelanggan           
+#--------Fungsi Dataset Pelanggan 2        
 def create_daily_installations_df(df):
-    daily_installations_df = df.resample(rule='D', on='Tanggal_Terpasang').agg({
-        'No_Reg': 'nunique',
-        'Biaya': 'sum'
+    
+    df_paid = df[df['Status'] == 'PAID']
+
+    daily_installations_df = df_paid.resample(rule='D', on='Installation_Date').agg({
+        'Registration_Number': 'nunique',
+        'Final_Amount': 'sum'
     })
     daily_installations_df = daily_installations_df.reset_index()
     daily_installations_df.rename(columns={
-        'No_Reg': 'install_count',
-        'Biaya': 'revenue'
+        'Registration_Number': 'install_count',
+        'Final_Amount': 'revenue'
     }, inplace=True)
     
+    # Menambahkan kolom baru untuk 35% dan 65% dari revenue
+    daily_installations_df['revenue_35_percent'] = daily_installations_df['revenue'] * 0.35
+    daily_installations_df['revenue_65_percent'] = daily_installations_df['revenue'] * 0.65
+    
     return daily_installations_df
+
+def create_daily_installations2_df(df):
+    
+    df_unpaid = df[df['Status'] == 'UNPAID']
+
+    daily_installations2_df = df_unpaid.resample(rule='D', on='Installation_Date').agg({
+        'Registration_Number': 'nunique',
+        'Final_Amount': 'sum'
+    })
+    daily_installations2_df = daily_installations2_df.reset_index()
+    daily_installations2_df.rename(columns={
+        'Registration_Number': 'install_count',
+        'Final_Amount': 'revenue'
+    }, inplace=True)
+    
+    # Menambahkan kolom baru untuk 35% dan 65% dari revenue
+    daily_installations2_df['revenue_35_percent'] = daily_installations2_df['revenue'] * 0.35
+    daily_installations2_df['revenue_65_percent'] = daily_installations2_df['revenue'] * 0.65
+    
+    return daily_installations2_df
+
+def create_daily_registration_df(df):
+    # Mengelompokkan data berdasarkan 'Installation_Date' dan 'Type'
+    daily_registration_df = df.groupby([df['Installation_Date'].dt.date, 'Type','Status']).agg({
+        'Registration_Number': 'nunique',
+        'Final_Amount': 'sum'
+    }).reset_index()
+
+    # Mengubah nama kolom
+    daily_registration_df.rename(columns={
+        'Registration_Number': 'install_count',
+        'Status': 'description',
+        'Final_Amount': 'revenue'
+    }, inplace=True)
+    
+    return daily_registration_df
     
 def create_sum_order_items_df(df):
-    paket_counts = df.groupby('Paket')['No_Reg'].nunique()
+    paket_counts = df.groupby('Internet_Package')['Registration_Number'].nunique()
     # Mengurutkan hasil berdasarkan jumlah pemasangan secara menurun
     paket_counts = paket_counts.sort_values(ascending=False)
     # Mengubah menjadi DataFrame
     sum_order_items_df = paket_counts.reset_index()
     # Mengganti nama kolom
-    sum_order_items_df.columns = ['Paket', 'quantity_x']
+    sum_order_items_df.columns = ['Internet_Package', 'quantity_x']
     
     return sum_order_items_df
 
 def create_bystatus_df(df):
-    bystatus_df = df.groupby(by='Status').No_Reg.nunique().reset_index()
+    bystatus_df = df.groupby(by='Status_Customer').Registration_Number.nunique().reset_index()
     bystatus_df.rename(columns={
-        'No_Reg': 'customer_count'
+        'Registration_Number': 'customer_count'
     }, inplace=True)
-    bystatus_df['Status'] = pd.Categorical(bystatus_df['Status'],["aktif", "aktif trial", "isolir","dismantle","dismantle trial"])
 
     return bystatus_df
 
-def create_bychurn_df(df):
-    bychurn_df = df.groupby(by='Churn').No_Reg.nunique().reset_index()
-    bychurn_df.rename(columns={
-        'No_Reg': 'customer_count',     
+def create_bytype_df(df):
+    bytype_df =  df.groupby(by='Type').Registration_Number.nunique().reset_index()
+    bytype_df.rename(columns={
+        'Registration_Number': 'customer_count'
     }, inplace=True)
-    
-    return bychurn_df
+
+    return bytype_df
+
+def create_byownership_status_df(df):
+    byownership_df = df.groupby(by='Building_Ownership_Status').Registration_Number.nunique().reset_index()
+    byownership_df.rename(columns={
+        'Registration_Number': 'customer_count'
+    }, inplace=True)
+
+    return byownership_df
+
+def create_bystatus_paid_df(df):
+    bystatus_paid_df = df.groupby(by='Status').Registration_Number.nunique().reset_index()
+    bystatus_paid_df.rename(columns={
+        'Registration_Number': 'customer_count'
+    }, inplace=True)
+
+    return bystatus_paid_df
+
+def create_bypayment_method_df(df):
+    bypayment_method_df = df.groupby(by='Payment_Method').Registration_Number.nunique().reset_index()
+    bypayment_method_df.rename(columns={
+        'Registration_Number': 'customer_count'
+    }, inplace=True)
+
+    return bypayment_method_df
     
 def create_rfm_df(df):
-    rfm_df = df.groupby(by='No_Reg', as_index=False).agg({
-        "Tanggal_Terpasang": "max", #mengambil tanggal order terakhir
-        "Nama": "nunique",
-        "Biaya": "sum"
+    rfm_df = df.groupby(by='Customer_Number', as_index=False).agg({
+        "Installation_Date": "max", #mengambil tanggal order terakhir
+        "Billing_Number": "nunique",
+        "Final_Amount": "sum"
     })
-    rfm_df.columns = ['No_Reg', 'max_order_timestamp', 'frequency','monetary']
+    rfm_df.columns = ['Customer_Number', 'max_order_timestamp', 'frequency','monetary']
     
     rfm_df["max_order_timestamp"] = rfm_df["max_order_timestamp"].dt.date
-    recent_date = df["Tanggal_Terpasang"].dt.date.max()
+    recent_date = df["Installation_Date"].dt.date.max()
     rfm_df["recency"] = rfm_df["max_order_timestamp"].apply(lambda x: (recent_date - x).days)
     rfm_df.drop("max_order_timestamp", axis=1, inplace=True)
     
     return rfm_df
-
-# Fungsi untuk menghitung churn per paket dan churn keseluruhan
-def create_churn_percentage_df(df):
-    # Menghitung total pelanggan churn dan total pelanggan per paket
-    churn_counts = df[df['Churn_numeric'] == 1].groupby('Paket')['Churn_numeric'].sum()
-    total_counts = df.groupby('Paket')['Churn_numeric'].count()
-
-    # Mengisi nilai yang hilang dengan 0 jika tidak ada churn di suatu paket
-    churn_counts = churn_counts.reindex(total_counts.index, fill_value=0)
-
-    # Menghitung persentase churn per paket
-    churn_percentage_per_paket = (churn_counts / total_counts) * 100
-
-    # Membuat dataframe baru dengan jumlah pelanggan churn dan persentase churn per paket
-    churn_percentage_df = pd.DataFrame({
-        'Paket': total_counts.index,
-        'Total Pelanggan': total_counts.values,
-        'Jumlah Pelanggan Churn': churn_counts.values,
-        'Churn (%)': churn_percentage_per_paket.values
-    }).reset_index(drop=True)
-
-    # Menghitung churn keseluruhan (total churn rate untuk seluruh pelanggan)
-    total_pelanggan = total_counts.sum()
-    total_pelanggan_churn = churn_counts.sum()
-    overall_churn_percentage = (total_pelanggan_churn / total_pelanggan) * 100
-
-    return churn_percentage_df, overall_churn_percentage
 
 # Fungsi untuk mengonversi DataFrame ke format Excel
 def convert_df_to_excel(df):
@@ -274,7 +313,7 @@ st.header('🌐Dashboard Pelanggan Internet V-NET Indonesia')
 
 st.sidebar.image("images/logo.png",caption="")
 
-tab1, tab2, = st.tabs(['📊Data Pelanggan VNET','📊Data Income VNET']) 
+tab1, tab2, = st.tabs(['📊Data Pelanggan VNET dan Viberlink','📊Data Pelanggan VNET (Jakarta,Bandung,Sukabumi)']) 
  
 with tab1:
     with st.expander("Upload Dataset Pelanggan", expanded=True, icon="📤"):
@@ -291,114 +330,235 @@ with tab1:
         try:
             with st.sidebar:
                 all_df = pd.read_excel(dataset)
-                datetime_columns = ["Tanggal_Terpasang", "Tanggal_Jatuh_Tempo"]
-                all_df.sort_values(by="Tanggal_Terpasang", inplace=True)
+                datetime_columns = ["Installation_Date", "Due_Date"]
+                all_df.sort_values(by="Installation_Date", inplace=True)
                 all_df.reset_index(inplace=True)
                 
                 for column in datetime_columns:
                     all_df[column] = pd.to_datetime(all_df[column])
                     
-                min_date = all_df["Tanggal_Terpasang"].min()
-                max_date = all_df["Tanggal_Terpasang"].max()
+                min_date = all_df["Installation_Date"].min()
+                max_date = all_df["Installation_Date"].max()
+                owners = all_df['Owner'].unique()  # Mengambil daftar area unik
+
                     
                     # Mengambil start_date & end_date dari date_input
                 start_date, end_date = st.date_input(
-                    label='📅 Rentang Waktu Pelanggan',min_value=min_date,
+                    label='📅 Rentang Waktu Pelanggan Viberlink dan VNET',min_value=min_date,
                     max_value=max_date,
                     value=[min_date, max_date]
                     )
+                
+                selected_owner = st.selectbox('🌍Pilih Owner', options=owners, index=0) # owner
+
             
-            main_df = all_df[(all_df["Tanggal_Terpasang"] >= str(start_date)) & 
-                                (all_df["Tanggal_Terpasang"] <= str(end_date  + pd.Timedelta(days=1)))]
+            main_df = all_df[(all_df["Installation_Date"] >= str(start_date)) & 
+                            # (all_df["Installation_Date"] <= str(end_date  + pd.Timedelta(days=1))) &\
+                            (all_df["Installation_Date"] <= str(end_date)) &
+                            (all_df['Owner'] == selected_owner)
+                            ]
                 
             sum_order_items_df = create_sum_order_items_df(main_df)
             daily_installations_df = create_daily_installations_df(main_df)
+            daily_installations2_df = create_daily_installations2_df(main_df)
             bystatus_df = create_bystatus_df(main_df)
-            bychurn_df = create_bychurn_df(main_df)
+            bytype_df = create_bytype_df(main_df)
+            daily_registration_df = create_daily_registration_df(main_df)
+            byownership_df = create_byownership_status_df(main_df)
+            bystatus_paid_df = create_bystatus_paid_df(main_df)
+            bypayment_method_df = create_bypayment_method_df(main_df)
+            # bychurn_df = create_bychurn_df(main_df)
             rfm_df = create_rfm_df(main_df)    
-            churn_percentage_df, overall_churn_percentage = create_churn_percentage_df(main_df)
+            # churn_percentage_df, overall_churn_percentage = create_churn_percentage_df(main_df)
             
             st.subheader('Daily Installations')
             # Membuat visualisasi dengan Plotly
-            graf, churn, = st.columns(2, gap='small')
-            with graf:
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.info('Total installations',icon="🔧")
-                    total_installations = daily_installations_df.install_count.sum()
-                    st.metric("Total installations", value=total_installations)        
-                with col2:
+            # graf = st.columns(1, gap='small')
+            # with graf:
+          
+            rev, rev2, = st.columns(2, gap='small')
+            col1, col2, col3, col4, = st.columns(4)
+            if selected_owner == 'VNET':
+                with rev:
                     st.info('Total Revenue',icon="💰")
-                    total_revenue = format_currency(daily_installations_df.revenue.sum(), "IDR", locale='id_ID') 
-                    st.metric("Total Revenue", value=total_revenue)
-                    style_metric_cards(background_color="#FFFFFF",border_left_color="#29abe2",border_color="#000000",box_shadow="#F71938")    
-                    
+                    total_paid_revenue = format_currency(daily_installations_df.revenue.sum(), "IDR", locale='id_ID') 
+                    st.metric("Total", value=total_paid_revenue)
+                with rev2:
+                    st.info('Total Trade Receivables',icon="💰")
+                    total_unpaid_revenue = format_currency(daily_installations2_df.revenue.sum(), "IDR", locale='id_ID') 
+                    st.metric("Total", value=total_unpaid_revenue)
+            if selected_owner == 'Viberlink':
+                with col1:
+                    st.info('Total Revenue (PAID)',icon="💰")
+                    total_paid_revenue = format_currency(daily_installations_df.revenue.sum(), "IDR", locale='id_ID') 
+                    st.metric("Total", value=total_paid_revenue)
+                with col2:
+                    st.info('Total Trade Receivables (UNPAID)',icon="💰")
+                    total_unpaid_revenue = format_currency(daily_installations2_df.revenue.sum(), "IDR", locale='id_ID') 
+                    st.metric("Total", value=total_unpaid_revenue)
+                with col3:
+                    st.info('Total Revenue Viberlink 65%',icon="💰")
+                    total_revenue_65_percent = format_currency(daily_installations_df['revenue_65_percent'].sum(), "IDR", locale='id_ID')
+                    st.metric("Total Revenue", value=total_revenue_65_percent)
+                with col4:
+                    st.info('Total Revenue VNET 35%',icon="💰")
+                    total_revenue_35_percent = format_currency(daily_installations_df['revenue_35_percent'].sum(), "IDR", locale='id_ID')
+                    st.metric("Total Revenue", value=total_revenue_35_percent)                           
+                  
+            style_metric_cards(background_color="#FFFFFF",border_left_color="#29abe2",border_color="#000000",box_shadow="#F71938")   
+                            
+            trans1, trans2, = st.columns(2)
+           
+            with trans1:
                 fig = go.Figure()
+                
+                registration_df = daily_registration_df[daily_registration_df['Type'] == 'REGISTRATION']
 
                 # Menambahkan data pemasangan
                 fig.add_trace(go.Scatter(
-                    x=daily_installations_df["Tanggal_Terpasang"],
-                    y=daily_installations_df["install_count"],
+                    x=registration_df["Installation_Date"],
+                    y=registration_df["install_count"],
                     mode='lines+markers',
-                    marker=dict(color='#90CAF9'),
+                    marker=dict(color='#0000FF'),
                     line=dict(width=2),
-                    name='Total Pemasangan',
-                    hovertemplate="<b>Tanggal: %{x}<br>Total Pemasangan: %{y}<br>Pendapatan: Rp %{customdata:,.0f}<extra></extra></b>",
-                    customdata=daily_installations_df['revenue']
+                    name='Registration',
+                    hovertemplate="<b>Tanggal: %{x}<br>Total Transaksi: %{y}<br>Pendapatan: Rp %{customdata:,.0f}<extra></extra></b>",
+                    customdata=registration_df['revenue']
                 ))
 
                 # Mengatur layout
                 fig.update_layout(
-                    title="<b>📈 Total Pemasangan Harian</b>",
+                    title="<b>📈 Total Transaksi Harian</b>",
                     xaxis_title='Tanggal',
-                    yaxis_title='Total Pemasangan',
+                    yaxis_title='Total Transaksi',
                     template="plotly_white",
                     xaxis_tickangle=-45,
-                    yaxis=dict(title='Total Pemasangan', side='left', showgrid=True),
+                    yaxis=dict(title='Total Transaksi', side='left', showgrid=True),
+                    plot_bgcolor='rgba(0, 0, 0, 0)',
+                    paper_bgcolor='rgba(0, 0, 0, 0)',
+                    height=600,
+                    width=900
+                )
+                
+                # customer_df = daily_registration_df[daily_registration_df['Type'] == 'CUSTOMER']
+                customer_df = daily_registration_df[(daily_registration_df['Type'] == 'CUSTOMER') & 
+                                            (daily_registration_df['description'] == 'PAID')]  
+                
+                customer_df['customdata'] = customer_df.apply(
+                    lambda row: f"Rp {row['revenue']:,} {row['description']} = {row['install_count']}", axis=1
+                )
+                
+                    # Menambahkan data pemasangan
+                fig.add_trace(go.Scatter(
+                    x=customer_df["Installation_Date"],
+                    y=customer_df["install_count"],
+                    mode='lines+markers',
+                    marker=dict(color='#008000'),
+                    line=dict(width=2),
+                    name='Customer (PAID)',
+                    hovertemplate="<b>Tanggal: %{x}<br>Total Transaksi: %{y}<br>Pendapatan:%{customdata}<extra></extra></b>",
+                    customdata=customer_df['customdata']
+                ))
+
+                # Mengatur layout
+                fig.update_layout(
+                    title="<b>📈 Total Transaksi Harian</b>",
+                    xaxis_title='Tanggal',
+                    yaxis_title='Total Transaksi',
+                    template="plotly_white",
+                    xaxis_tickangle=-45,
+                    yaxis=dict(title='Total Transaksi', side='left', showgrid=True),
                     plot_bgcolor='rgba(0, 0, 0, 0)',
                     paper_bgcolor='rgba(0, 0, 0, 0)',
                     height=600,
                     width=900
                 )
 
-                # Menampilkan grafik total pemasangan
-                st.plotly_chart(fig, use_container_width=True)    
-            with churn:    
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    total_churn = churn_percentage_df['Jumlah Pelanggan Churn'].sum()
-                    st.info('Total Churn Customers',icon="👤")
-                    st.metric("Jumlah Pelanggan yang Churn", value=total_churn)
-
-                with col2:
-                    # Menampilkan persentase churn keseluruhan (bukan rata-rata churn per paket)
-                    st.info('Total Churn Percentage',icon="📝")
-                    st.metric("Total Churn (%)", value=f"{overall_churn_percentage:.2f}%")
+                customer_df = daily_registration_df[(daily_registration_df['Type'] == 'CUSTOMER') & 
+                                            (daily_registration_df['description'] == 'UNPAID')]  
                 
-                # Filter data untuk persentase churn
-                churn_percentage_filtered = churn_percentage_df[churn_percentage_df['Churn (%)'] > 0]
-                labels = churn_percentage_filtered['Paket']
-                sizes = churn_percentage_filtered['Jumlah Pelanggan Churn']
+                customer_df['customdata'] = customer_df.apply(
+                    lambda row: f"Rp {row['revenue']:,} {row['description']} = {row['install_count']}", axis=1
+                )
+                
+                # Menambahkan data pemasangan
+                fig.add_trace(go.Scatter(
+                    x=customer_df["Installation_Date"],
+                    y=customer_df["install_count"],
+                    mode='lines+markers',
+                    marker=dict(color='#ffde59'),
+                    line=dict(width=2),
+                    name='Customer (UNPAID)',
+                    hovertemplate="<b>Tanggal: %{x}<br>Total Transaksi: %{y}<br>Pendapatan:%{customdata}<extra></extra></b>",
+                    customdata=customer_df['customdata']
+                ))
 
-                # Membuat pie chart menggunakan Plotly Express
-                fig = px.pie(
-                    churn_percentage_filtered, 
-                    values='Jumlah Pelanggan Churn', 
-                    names='Paket', 
-                    title='Persentase Churn Berdasarkan Jenis Paket',
-                    color_discrete_sequence=px.colors.qualitative.Set3
+                # Mengatur layout
+                fig.update_layout(
+                    title="<b>📈 Total Transaksi Harian</b>",
+                    xaxis_title='Tanggal',
+                    yaxis_title='Total Transaksi',
+                    template="plotly_white",
+                    xaxis_tickangle=-45,
+                    yaxis=dict(title='Total Transaksi', side='left', showgrid=True),
+                    plot_bgcolor='rgba(0, 0, 0, 0)',
+                    paper_bgcolor='rgba(0, 0, 0, 0)',
+                    height=600,
+                    width=900
                 )
 
-                # Menampilkan persentase dan label pada pie chart
-                fig.update_traces(textinfo='percent+label')
 
-                # Menampilkan pie chart di Streamlit
-                st.plotly_chart(fig, use_container_width=True)
+                # Menampilkan grafik total pemasangan
+                st.plotly_chart(fig, use_container_width=True) 
             
-            # st.pyplot(fig)
-            col_best, col_worst, col_stats, col_churn, = st.columns(4, gap='small')
+            with trans2:
+                # Filter untuk kategori REGISTRATION
+                registration_df = daily_registration_df[daily_registration_df['Type'] == 'REGISTRATION']
+                registration_count = registration_df['install_count'].sum()
+
+                # Filter untuk kategori CUSTOMER PAID
+                customer_paid_df = daily_registration_df[(daily_registration_df['Type'] == 'CUSTOMER') & 
+                                                        (daily_registration_df['description'] == 'PAID')]
+                customer_paid_count = customer_paid_df['install_count'].sum()
+
+                # Filter untuk kategori CUSTOMER UNPAID
+                customer_unpaid_df = daily_registration_df[(daily_registration_df['Type'] == 'CUSTOMER') & 
+                                                            (daily_registration_df['description'] == 'UNPAID')]
+                customer_unpaid_count = customer_unpaid_df['install_count'].sum()
+
+                # Data untuk Pie chart
+                labels = ['Registration', 'Customer (Paid)', 'Customer (Unpaid)']
+                values = [registration_count, customer_paid_count, customer_unpaid_count]
+
+                # Membuat Pie chart
+                fig = go.Figure(data=[go.Pie(
+                    labels=labels, 
+                    values=values, 
+                    hole=0.3,  # Membuat donut chart dengan hole di tengah
+                    hovertemplate="<b>%{label}</b><br>Total Transaksi: %{value}<extra></extra>", # Menampilkan total transaksi dan pendapatan pada hover
+                    textinfo='percent+label',  # Menampilkan persen dan label
+                    marker=dict(colors=['#0000FF', '#008000', '#FFDE59'])  # Warna untuk masing-masing kategori
+                )])
+
+                # Menambahkan judul dan layout untuk Pie chart
+                fig.update_layout(
+                    title="<b>📊 Proporsi Transaksi Berdasarkan Kategori</b>",
+                    template="plotly_white",
+                    height=600,
+                    width=700,
+                    plot_bgcolor='rgba(0, 0, 0, 0)',
+                    paper_bgcolor='rgba(0, 0, 0, 0)'
+                )
+
+                # Menampilkan grafik Pie chart
+                st.plotly_chart(fig, use_container_width=True)
+                
+                total_status_active = bystatus_df[bystatus_df['Status_Customer'] == 'Active']['customer_count'].sum()
+                st.markdown(f"- **Total Customer Active: {total_status_active}**")
+                
+    
+            col_best, col_worst, col_type, col_pay, = st.columns(4, gap='small')
+            
             best_products = sum_order_items_df.head(5)
             worst_products = sum_order_items_df.sort_values(by="quantity_x", ascending=True).head(5)
             with col_best:
@@ -406,19 +566,21 @@ with tab1:
                 fig_best = px.bar(
                     best_products,
                     x="quantity_x",
-                    y="Paket",
+                    y="Internet_Package",
                     orientation='h',
-                    title="<b>📈 BEST PERFORMING PRODUCT</b>",
+                    title="<b>📈 Best Performing Product</b>",
                     color_discrete_sequence=["#90CAF9"] * len(best_products),
-                    labels={"quantity_x": "Number of Sales", "Paket": "Paket"},
+                    labels={"quantity_x": "Number of Sales", "Internet_Package": "Paket"},
                     template="plotly_white"
                 )
 
                 fig_best.update_layout(
                     xaxis=dict(title="Number of Sales", showgrid=True, gridcolor='#cecdcd'),
-                    yaxis=dict(title=None, showgrid=False),
+                    yaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
                     plot_bgcolor='rgba(0, 0, 0, 0)',
                     paper_bgcolor='rgba(0, 0, 0, 0)',
+                    height=400
+
                 )
 
                 # Menampilkan grafik produk terbaik
@@ -428,69 +590,116 @@ with tab1:
                 fig_worst = px.bar(
                     worst_products,
                     x="quantity_x",
-                    y="Paket",
+                    y="Internet_Package",
                     orientation='h',
-                    title="<b>📉 WORST PERFORMING PRODUCT</b>",
+                    title="<b>📉 Worst Performing Product</b>",
                     color_discrete_sequence=["#90CAF9"] * len(worst_products),
-                    labels={"quantity_x": "Number of Sales", "Paket": "Paket"},
+                    labels={"quantity_x": "Number of Sales", "Internet_Package": "Paket"},
                     template="plotly_white"
                 )
 
                 fig_worst.update_layout(
                     xaxis=dict(title="Number of Sales", showgrid=True, gridcolor='#cecdcd'),
-                    yaxis=dict(title=None, showgrid=False),
+                    yaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
                     plot_bgcolor='rgba(0, 0, 0, 0)',
                     paper_bgcolor='rgba(0, 0, 0, 0)',
                     yaxis_tickmode='linear',
                     yaxis_tickvals=list(range(len(worst_products))),
+                    height=400
+
                 )
 
                 # Menampilkan grafik produk terburuk
                 st.plotly_chart(fig_worst, use_container_width=True)
 
-            with col_stats:
-                # Visualisasi untuk jumlah pelanggan berdasarkan status
-                fig_status = px.bar(
-                    bystatus_df.sort_values(by="Status", ascending=False),
-                    x="Status",
+            with col_type:
+                # Visualisasi untuk jumlah pelanggan berdasarkan tipe
+                fig_type = px.bar(
+                    bytype_df.sort_values(by="Type", ascending=False),
+                    x="Type",
                     y="customer_count",
-                    title="<b>👤 Number of Customer by Status</b>",
-                    color_discrete_sequence=["#90CAF9"] * len(bystatus_df),
-                    labels={"customer_count": "Number of Customers", "Status": "Customer Status"},
+                    title="<b>👤Number of Customer by Type</b>",
+                    color_discrete_sequence=["#90CAF9"] * len(bytype_df),
+                    labels={"customer_count": "Number of Customers", "Type": "Tipe"},
                     template="plotly_white"
                 )
 
-                fig_status.update_layout(
+                fig_type.update_layout(
                     xaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
                     yaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
-                    yaxis_tickangle=-45,
-                    height=500
+                    yaxis_tickangle=0,
+                    height=400
                 )
 
                 # Menampilkan grafik jumlah pelanggan berdasarkan status
-                st.plotly_chart(fig_status, use_container_width=True)
-            
-            with col_churn:
-                # Visualisasi untuk jumlah pelanggan berdasarkan churn
-                fig_churn = px.bar(
-                    bychurn_df.sort_values(by="customer_count", ascending=False),
-                    x="Churn",
+                st.plotly_chart(fig_type, use_container_width=True)
+                
+            with col_pay:
+                fig_pay = px.bar(
+                    bystatus_paid_df.sort_values(by="Status", ascending=False),
+                    x="Status",
                     y="customer_count",
-                    title="<b>👤 Number of Customer by Churn</b>",
-                    color_discrete_sequence=["#90CAF9", "#D3D3D3"],
-                    labels={"customer_count": "Number of Customers", "Churn": "Churn Status"},
+                    title="<b>👤 Number of Customer by Payment Status</b>",
+                    color_discrete_sequence=["#90CAF9"] * len(bystatus_paid_df),
+                    labels={"customer_count": "Number of Customers", "Status": "Status Pembayaran"},
                     template="plotly_white"
                 )
 
-                fig_churn.update_layout(
+                fig_pay.update_layout(
                     xaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
                     yaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
-                    yaxis_tickangle=-45,
-                    height=500
+                    yaxis_tickangle=0,
+                    height=400
                 )
 
-                # Menampilkan grafik jumlah pelanggan berdasarkan churn
-                st.plotly_chart(fig_churn, use_container_width=True)
+                # Menampilkan grafik jumlah pelanggan berdasarkan status
+                st.plotly_chart(fig_pay, use_container_width=True)
+                       
+            col_ownership, col_paymethod, = st.columns(2)
+            
+            with col_ownership:
+                # Visualisasi untuk jumlah pelanggan berdasarkan building ownership
+                fig_ownership = px.bar(
+                    byownership_df.sort_values(by="Building_Ownership_Status", ascending=False),
+                    x="Building_Ownership_Status",
+                    y="customer_count",
+                    title="<b>👤Number of Customer by Building Ownership Status</b>",
+                    color_discrete_sequence=["#90CAF9"] * len(byownership_df),
+                    labels={"customer_count": "Number of Customers", "Building_Ownership_Status": "Pemilik"},
+                    template="plotly_white"
+                )
+
+                fig_ownership.update_layout(
+                    xaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
+                    yaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
+                    yaxis_tickangle=0,
+                    height=400
+                )
+
+                # Menampilkan grafik jumlah pelanggan berdasarkan status
+                st.plotly_chart(fig_ownership, use_container_width=True)
+                
+            with col_paymethod:
+                fig_paymethod = px.bar(
+                    bypayment_method_df.sort_values(by="Payment_Method", ascending=False),
+                    x="Payment_Method",
+                    y="customer_count",
+                    title="<b>👤 Number of Customer by Payment Method</b>",
+                    color_discrete_sequence=["#90CAF9"] * len(bypayment_method_df),
+                    labels={"customer_count": "Number of Customers", "Payment_Method": "Metode Pembayaran"},
+                    template="plotly_white"
+                )
+
+                fig_paymethod.update_layout(
+                    xaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
+                    yaxis=dict(title=None, showgrid=True, gridcolor='#cecdcd'),
+                    yaxis_tickangle=0,
+                    height=400
+                )
+
+                # Menampilkan grafik jumlah pelanggan berdasarkan status
+                st.plotly_chart(fig_paymethod, use_container_width=True)
+        
 
             st.subheader("Best Customer Based on RFM Parameters")
             
@@ -513,7 +722,7 @@ with tab1:
             # Grafik berdasarkan Recency
             fig_recency = px.bar(
                 rfm_df.sort_values(by="recency", ascending=True).head(5),
-                x="No_Reg",
+                x="Customer_Number",
                 y="recency",
                 title="<b>By Recency (days)</b>",
                 color_discrete_sequence=["#90CAF9"],
@@ -524,13 +733,14 @@ with tab1:
                 xaxis_title="Pelanggan",
                 xaxis_tickangle=-45,
                 plot_bgcolor='rgba(0, 0, 0, 0)',
-                paper_bgcolor='rgba(0, 0, 0, 0)'
+                paper_bgcolor='rgba(0, 0, 0, 0)',
+                height=400
             )
 
             # Grafik berdasarkan Frequency
             fig_frequency = px.bar(
                 rfm_df.sort_values(by="frequency", ascending=False).head(5),
-                x="No_Reg",
+                x="Customer_Number",
                 y="frequency",
                 title="<b>By Frequency</b>",
                 color_discrete_sequence=["#90CAF9"],
@@ -541,13 +751,14 @@ with tab1:
                 xaxis_title="Pelanggan",
                 xaxis_tickangle=-45,
                 plot_bgcolor='rgba(0, 0, 0, 0)',
-                paper_bgcolor='rgba(0, 0, 0, 0)'
+                paper_bgcolor='rgba(0, 0, 0, 0)',
+                height=400
             )
 
             # Grafik berdasarkan Monetary
             fig_monetary = px.bar(
                 rfm_df.sort_values(by="monetary", ascending=False).head(5),
-                x="No_Reg",
+                x="Customer_Number",
                 y="monetary",
                 title="<b>By Monetary</b>",
                 color_discrete_sequence=["#90CAF9"],
@@ -558,7 +769,8 @@ with tab1:
                 xaxis_title="Pelanggan",
                 xaxis_tickangle=-45,
                 plot_bgcolor='rgba(0, 0, 0, 0)',
-                paper_bgcolor='rgba(0, 0, 0, 0)'
+                paper_bgcolor='rgba(0, 0, 0, 0)',
+                height=400
             )
 
             # Menampilkan grafik di kolom Streamlit
@@ -576,9 +788,13 @@ with tab1:
             with ket_m:
                 st.markdown("- **Monetary (M)**: Mengukur total uang yang dihabiskan oleh pelanggan dalam periode tertentu. Semakin tinggi total pengeluaran, semakin tinggi nilai M.")
         except Exception as e:
-            st.error("Terjadi kesalahan saat membaca file atau dataset tidak sesuai")
+            # st.error("Terjadi kesalahan saat membaca file atau dataset tidak sesuai")
+                # Menampilkan detail traceback untuk melihat dimana error terjadi
+            # Menampilkan pesan error
+            print(f"Pesan error: {str(e)}")
     else:
         st.info("Silakan unggah file dataset untuk menampilkan visualisasi.")
+
 with tab2: 
     with st.expander("Upload Dataset Income", expanded=True, icon="📤"):
         dataset2 = st.file_uploader(label = 'Upload your dataset income: ', type=['xlsx'], label_visibility='hidden')
@@ -606,7 +822,7 @@ with tab2:
                 areas = all_data_clean['Area'].unique()  # Mengambil daftar area unik
 
                 start_date_clean, end_date_clean = st.date_input(
-                    label='📅 Rentang Waktu Data Incomes',
+                    label='📅 Rentang Waktu Data Pelanggan VNET',
                     min_value=min_date_clean,
                     max_value=max_date_clean,
                     value=[min_date_clean, max_date_clean]
@@ -616,7 +832,7 @@ with tab2:
 
             
             main_data_clean = all_data_clean[(all_data_clean["Tanggal_Aktif"] >= str(start_date_clean)) & 
-                                            (all_data_clean["Tanggal_Aktif"] <= str(end_date_clean + pd.Timedelta(days=1))) &
+                                            # (all_data_clean["Tanggal_Aktif"] <= str(end_date_clean + pd.Timedelta(days=1))) &
                                             (all_data_clean['Area'] == selected_area)
                                         ]
 
@@ -763,7 +979,7 @@ with tab2:
                     x="quantity_x",
                     y="Paket_Langganan",
                     orientation='h',
-                    title="<b>📈 BEST PERFORMING PRODUCT</b>",
+                    title="<b>📈 Best Performing Product</b>",
                     color_discrete_sequence=["#90CAF9"] * len(best_product),
                     labels={"quantity_x": "Jumlah Pelanggan Yang Aktivasi", "Paket_Langganan": "Paket Langganan"},
                     template="plotly_white"
@@ -785,7 +1001,7 @@ with tab2:
                     x="quantity_x",
                     y="Paket_Langganan",
                     orientation='h',
-                    title="<b>📉 WORST PERFORMING PRODUCT</b>",
+                    title="<b>📉 Worst Performing Product</b>",
                     color_discrete_sequence=["#90CAF9"] * len(worst_product),
                     labels={"quantity_x": "Jumlah Pelanggan Yang Aktivasi", "Paket_Langganan": "Paket Langganan"},
                     template="plotly_white"
@@ -980,7 +1196,7 @@ with tab2:
                     st.dataframe(X_scaled)
                     
             with st.spinner('Wait for it...'):
-                time.sleep(2)
+                time.sleep(3)
                 
             with st.expander("Statistik Hopkins dan Pencarian Nilai K yang optimal"):
                 col_hop_elbow, col_sil, = st.columns(2)        
@@ -1064,6 +1280,7 @@ with tab2:
 
                     # Menampilkan plot di Streamlit
                     st.plotly_chart(fig)
+
 
                 with clus2:
                     st.header("Clustering Profiling Using R-F-M")
@@ -1166,7 +1383,8 @@ with tab2:
                     )
                        
         except Exception as e:
-            st.error("Terjadi kesalahan saat membaca file atau dataset tidak sesuai")
+            # st.error("Terjadi kesalahan saat membaca file atau dataset tidak sesuai")
+            st.error(e)
     else:
         st.info("Silakan unggah file dataset untuk menampilkan visualisasi.")
 
